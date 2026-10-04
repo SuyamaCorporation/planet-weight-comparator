@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Weight on Different Planets</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+  .focus-ring:focus { outline: 3px solid #f97316; outline-offset: 2px; }
+</style>
+</head>
+<body class="bg-gray-950 text-white min-h-screen">
+<div class="max-w-3xl mx-auto px-4 py-6">
+  <h1 class="text-2xl font-bold text-center text-orange-400 mb-1">Weight on Different Planets</h1>
+  <p class="text-center text-gray-400 text-sm mb-6">Enter your weight · See how you'd feel across the solar system</p>
+
+  <!-- Input -->
+  <div class="flex flex-col sm:flex-row gap-3 items-center justify-center mb-8">
+    <div class="flex bg-gray-800 rounded-xl overflow-hidden border border-gray-700">
+      <input type="number" id="weight-input" value="70" min="1" max="999" step="0.1"
+        class="focus-ring bg-transparent px-4 py-3 text-xl font-bold text-white w-36 text-right border-none outline-none"
+        aria-label="Enter your weight">
+      <div class="flex">
+        <button id="unit-kg" class="focus-ring px-4 py-3 bg-orange-600 text-white font-semibold text-sm" aria-pressed="true">kg</button>
+        <button id="unit-lbs" class="focus-ring px-4 py-3 bg-gray-700 hover:bg-gray-600 text-gray-300 font-semibold text-sm transition" aria-pressed="false">lbs</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Planet Cards -->
+  <div id="planet-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 mb-6" aria-label="Weight on each planet"></div>
+
+  <!-- Chart -->
+  <div class="bg-gray-800 rounded-2xl p-4 mb-6">
+    <h2 class="text-sm font-semibold text-gray-300 mb-3 uppercase tracking-widest">Comparison Chart</h2>
+    <canvas id="planet-chart" aria-label="Bar chart comparing weight on planets"></canvas>
+  </div>
+
+  <!-- Fun facts -->
+  <div class="bg-gray-800 rounded-2xl p-4">
+    <h2 class="text-sm font-semibold text-gray-300 mb-3 uppercase tracking-widest">Fun Facts</h2>
+    <div id="fun-facts" class="space-y-2 text-sm text-gray-300"></div>
+  </div>
+</div>
+
+<script>
+const BODIES = [
+  {name:'Mercury', emoji:'☿', gravity:0.38, color:'#9ca3af', fact:'Despite being closest to the Sun, you\'d weigh only 38% of your Earth weight here.'},
+  {name:'Venus', emoji:'♀', gravity:0.91, color:'#fbbf24', fact:'Venus has a similar gravity to Earth, but its 465°C surface might be a bigger problem!'},
+  {name:'Earth', emoji:'🌍', gravity:1.00, color:'#3b82f6', fact:'Home sweet home — this is your reference weight.'},
+  {name:'Moon', emoji:'🌕', gravity:0.17, color:'#e5e7eb', fact:'On the Moon you\'d feel incredibly light — perfect for giant leaps!'},
+  {name:'Mars', emoji:'🔴', gravity:0.38, color:'#ef4444', fact:'Mars has the same gravity as Mercury. Future Martians will be very light!'},
+  {name:'Jupiter', emoji:'🟠', gravity:2.34, color:'#f97316', fact:'Jupiter\'s immense gravity would make you feel over twice as heavy — hard to even stand!'},
+  {name:'Saturn', emoji:'🪐', gravity:0.93, color:'#d4a017', fact:'Saturn\'s gravity is surprisingly close to Earth\'s despite being a gas giant.'},
+  {name:'Uranus', emoji:'🔵', gravity:0.92, color:'#67e8f9', fact:'Uranus has about the same surface gravity as Earth — if it had a solid surface!'},
+  {name:'Neptune', emoji:'💙', gravity:1.12, color:'#2563eb', fact:'Neptune is slightly denser than Uranus, giving you a little extra weight.'},
+  {name:'Pluto', emoji:'🌑', gravity:0.06, color:'#8b5cf6', fact:'On Pluto you\'d weigh just 6% of Earth weight — a 70 kg person weighs only 4.2 kg!'},
+];
+
+let unit = 'kg';
+let earthWeight = 70;
+
+function getWeightDisplay(w) {
+  const val = unit === 'kg' ? w : w * 2.20462;
+  return val.toFixed(1) + ' ' + unit;
+}
+
+function getPct(gravity) {
+  const diff = ((gravity - 1)*100);
+  return diff >= 0 ? '+'+diff.toFixed(0)+'%' : diff.toFixed(0)+'%';
+}
+
+function getKgWeight() {
+  const input = parseFloat(document.getElementById('weight-input').value) || 70;
+  return unit === 'kg' ? input : input / 2.20462;
+}
+
+function render() {
+  earthWeight = getKgWeight();
+  const grid = document.getElementById('planet-grid');
+  grid.innerHTML = '';
+  const weights = [];
+
+  BODIES.forEach(body => {
+    const w = earthWeight * body.gravity;
+    weights.push(unit==='kg' ? w : w*2.20462);
+    const pct = getPct(body.gravity);
+    const isEarth = body.name === 'Earth';
+    const div = document.createElement('div');
+    div.className = 'bg-gray-800 rounded-2xl p-3 text-center border transition ' + (isEarth ? 'border-blue-500' : 'border-gray-700');
+    div.innerHTML = `
+      <div class="text-3xl mb-1" role="img" aria-label="${body.name}">${body.emoji}</div>
+      <div class="font-bold text-sm text-white">${body.name}</div>
+      <div class="text-lg font-black mt-1" style="color:${body.color}">${getWeightDisplay(w)}</div>
+      <div class="text-xs mt-1 font-semibold ${body.gravity>1?'text-red-400':body.gravity<1?'text-green-400':'text-gray-400'}">${pct}</div>
+    `;
+    grid.appendChild(div);
+  });
+
+  updateChart(weights);
+  updateFacts();
+}
+
+let chart = null;
+function updateChart(weights) {
+  if (chart) { chart.data.datasets[0].data = weights; chart.update('none'); return; }
+  chart = new Chart(document.getElementById('planet-chart'), {
+    type: 'bar',
+    data: {
+      labels: BODIES.map(b => b.emoji + ' ' + b.name),
+      datasets: [{
+        label: 'Weight',
+        data: weights,
+        backgroundColor: BODIES.map(b => b.color + 'cc'),
+        borderColor: BODIES.map(b => b.color),
+        borderWidth: 2,
+        borderRadius: 6
+      }]
+    },
+    options: {
+      indexAxis: 'y',
+      responsive: true,
+      animation: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: ctx => ` ${ctx.raw.toFixed(1)} ${unit}` } }
+      },
+      scales: {
+        x: { ticks:{color:'#9ca3af'}, grid:{color:'rgba(255,255,255,0.07)'}, title:{display:true,text:`Weight (${unit})`,color:'#9ca3af'} },
+        y: { ticks:{color:'#d1d5db',font:{size:11}}, grid:{display:false} }
+      }
+    }
+  });
+}
+
+function updateFacts() {
+  const w = earthWeight;
+  const div = document.getElementById('fun-facts');
+  div.innerHTML = '';
+  BODIES.forEach(body => {
+    const bw = w * body.gravity;
+    const factDiv = document.createElement('div');
+    factDiv.className = 'flex items-start gap-2';
+    factDiv.innerHTML = `<span class="text-lg flex-shrink-0" role="img" aria-label="${body.name}">${body.emoji}</span><span><strong class="text-white">${body.name}:</strong> ${body.fact} <span class="text-orange-400 font-semibold">(${getWeightDisplay(bw)})</span></span>`;
+    div.appendChild(factDiv);
+  });
+}
+
+document.getElementById('weight-input').addEventListener('input', render);
+document.getElementById('unit-kg').addEventListener('click', () => {
+  const currentKg = getKgWeight();
+  unit='kg';
+  document.getElementById('weight-input').value = currentKg.toFixed(1);
+  document.getElementById('unit-kg').classList.add('bg-orange-600','text-white');
+  document.getElementById('unit-kg').classList.remove('bg-gray-700','text-gray-300');
+  document.getElementById('unit-lbs').classList.remove('bg-orange-600','text-white');
+  document.getElementById('unit-lbs').classList.add('bg-gray-700','text-gray-300');
+  document.getElementById('unit-kg').setAttribute('aria-pressed','true');
+  document.getElementById('unit-lbs').setAttribute('aria-pressed','false');
+  render();
+});
+document.getElementById('unit-lbs').addEventListener('click', () => {
+  const currentKg = getKgWeight();
+  unit='lbs';
+  document.getElementById('weight-input').value = (currentKg*2.20462).toFixed(1);
+  document.getElementById('unit-lbs').classList.add('bg-orange-600','text-white');
+  document.getElementById('unit-lbs').classList.remove('bg-gray-700','text-gray-300');
+  document.getElementById('unit-kg').classList.remove('bg-orange-600','text-white');
+  document.getElementById('unit-kg').classList.add('bg-gray-700','text-gray-300');
+  document.getElementById('unit-lbs').setAttribute('aria-pressed','true');
+  document.getElementById('unit-kg').setAttribute('aria-pressed','false');
+  render();
+});
+
+render();
+</script>
+</body>
+</html>
